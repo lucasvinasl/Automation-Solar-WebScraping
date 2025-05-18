@@ -1,0 +1,53 @@
+package com.automation.webscraping.solar.monitor.scraper.solis;
+
+import com.automation.webscraping.solar.monitor.model.Client;
+import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
+import com.automation.webscraping.solar.monitor.scraper.growatt.GrowattElementMap;
+import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import lombok.extern.slf4j.Slf4j;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+
+@Slf4j
+@Service
+public class SolisScraper implements PortalScraper {
+
+    @Override
+    public boolean isPortalAvailable(String manufacturerName) {
+        return Manufacturers.SOLIS.name().equalsIgnoreCase(manufacturerName);
+    }
+
+    @Override
+    public void webScrapingService(Client client) {
+        WebDriver driver = new ChromeDriver();
+        String url = client.getInverterManufacturer().getPortalUrl();
+        try{
+            driver.get(url);
+            driver.manage().window().maximize();
+            SolisElementMap webElementMapped = new SolisElementMap();
+            webElementMapped.waitAndMap(driver, Duration.ofSeconds(5));
+
+            webElementMapped.usernameInput.sendKeys(client.getUsername());
+            webElementMapped.passwordInput.sendKeys(client.getPassword());
+
+            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", webElementMapped.loginButton);
+            Thread.sleep(2000);
+            webElementMapped.checkBox.click();
+            Thread.sleep(1000);
+            webElementMapped.loginButton.click();
+            Thread.sleep(2000);
+
+            log.info("Login efetuado com sucesso! \n Cliente: {} - Portal: {}", client.getName(), client.getInverterManufacturer().getName());
+            driver.quit();
+        } catch (Exception e) {
+            log.error("Erro ao tentar acessar portal da {}: {}", client.getInverterManufacturer().getName(), e.getMessage());
+            throw new RuntimeException(
+                    String.format("Erro ao tentar acessar portal da %s : %s", client.getInverterManufacturer().getName(), e.getMessage()));
+        }
+
+    }
+}
