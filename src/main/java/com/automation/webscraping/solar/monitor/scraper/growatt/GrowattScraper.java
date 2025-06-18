@@ -1,22 +1,35 @@
 package com.automation.webscraping.solar.monitor.scraper.growatt;
 
+import com.automation.webscraping.solar.monitor.enums.Months;
+import com.automation.webscraping.solar.monitor.mapper.GrowattMapper;
 import com.automation.webscraping.solar.monitor.model.Client;
+import com.automation.webscraping.solar.monitor.model.EnergyYearlyData;
+import com.automation.webscraping.solar.monitor.repository.EnergyYearlyDataRepository;
 import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.devtools.DevTools;
+import org.openqa.selenium.devtools.v85.network.Network;
+import org.openqa.selenium.devtools.v85.network.model.RequestId;
+import org.openqa.selenium.devtools.v85.network.model.Response;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
 public class GrowattScraper implements PortalScraper {
+
+    @Autowired
+    private EnergyYearlyDataRepository energyYearlyDataRepository;
 
     @Override
     public boolean isPortalAvailable(String manufacturerName) {
@@ -40,8 +53,10 @@ public class GrowattScraper implements PortalScraper {
                 log.info("Cliente não possui condição de mais de uma planta: {}", e.getMessage());
             }
 
-
-            driver.quit();
+            clickOnEnergy(driver, webElementMapped);
+            Thread.sleep(1000);
+            setEnergyMonthly(driver, webElementMapped, client);
+            //driver.quit();
         }catch (Exception e){
             log.error("Erro ao tentar acessar portal da {}: {}", client.getInverterManufacturer().getName(), e.getMessage());
             throw new RuntimeException(
@@ -83,5 +98,52 @@ public class GrowattScraper implements PortalScraper {
         }
 
         return plants;
+    }
+
+    /* Vai habilitar a devtools, verificar todas as respostas de endpoints recebidas, encontrar a que eu preciso e
+    mapear o json especificado.
+     */
+    public void setEnergyMonthly(WebDriver driver, GrowattElementMap webElementMapped, Client client) {
+        DevTools devTools = ((ChromeDriver) driver).getDevTools();
+        devTools.createSession();
+        devTools.send(Network.enable(Optional.empty(), Optional.empty(), Optional.empty()));
+        AtomicBoolean processed = new AtomicBoolean(false);
+
+        devTools.addListener(Network.responseReceived(), response -> {
+            if (processed.get()) return;
+            Response res = response.getResponse();
+            String url = res.getUrl();
+
+            if (url.contains("getDevicesYearChart")) {
+                processed.set(true);
+
+                RequestId requestId = response.getRequestId();
+                Network.GetResponseBodyResponse body = devTools.send(Network.getResponseBody(requestId));
+                if (body != null) {
+                    String bodyString = body.getBody();
+                    log.info("📦 JSON capturado: {}", bodyString);
+
+                    int currentYear = Integer.parseInt(Objects.requireNonNull(driver.findElement(
+                                    By.xpath("//input[@id='val_energy_compare_Time' and @data-max]"))
+                            .getAttribute("data-max")));
+                    log.info("Ano atual: {}", currentYear);
+                    EnergyYearlyData energyYearlyData = GrowattMapper.toYearlyData(bodyString, client, currentYear);
+                    energyYearlyData.setInverterManufacturer(client.getInverterManufacturer());
+                    energyYearlyDataRepository.save(energyYearlyData);
+                }
+            }
+        });
+
+        clickOnEnergyMonth(driver, webElementMapped);
+    }
+
+    private void clickOnEnergy(WebDriver driver, GrowattElementMap webElementMapped){
+        webElementMapped.waitAndMapEnergyButton(driver, Duration.ofSeconds(5));
+        webElementMapped.energyButton.click();
+    }
+
+    private void clickOnEnergyMonth(WebDriver driver, GrowattElementMap webElementMapped){
+        webElementMapped.waitAndMapEnergyButtonMonth(driver, Duration.ofSeconds(5));
+        webElementMapped.energyButtonMonth.click();
     }
 }

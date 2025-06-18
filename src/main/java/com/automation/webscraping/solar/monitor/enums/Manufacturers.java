@@ -1,4 +1,4 @@
-package com.automation.webscraping.solar.monitor.spreadsheet.enums;
+package com.automation.webscraping.solar.monitor.enums;
 
 public enum Manufacturers {
     GROWATT("Growatt", "https://server.growatt.com/?lang=pt"),

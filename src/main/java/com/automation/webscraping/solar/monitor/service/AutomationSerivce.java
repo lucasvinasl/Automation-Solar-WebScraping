@@ -3,7 +3,7 @@ package com.automation.webscraping.solar.monitor.service;
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.repository.ClientRepository;
 import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import com.automation.webscraping.solar.monitor.spreadsheet.reader.ExcelClientCredentials;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

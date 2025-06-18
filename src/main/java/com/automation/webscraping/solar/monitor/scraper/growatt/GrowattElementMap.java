@@ -14,6 +14,9 @@ public class GrowattElementMap {
     public WebElement passwordInput;
     public WebElement loginButton;
     public WebElement selectPlant;
+    public WebElement energyButton;
+    public WebElement energyButtonMonth;
+    public WebElement currentEnergyYear;
 
     public void waitAndMaoLoginElements(WebDriver driver, Duration timeout) {
         WebDriverWait wait = new WebDriverWait(driver, timeout);
@@ -27,7 +30,21 @@ public class GrowattElementMap {
     //caso de Ethan
     public void waitAndMapPlantListVerify(WebDriver driver, Duration timeout){
         WebDriverWait wait = new WebDriverWait(driver, timeout);
+
         this.selectPlant = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//div[@id='selectPlant-con']")));
+    }
+
+    public void waitAndMapEnergyButton(WebDriver driver, Duration timeout) {
+        WebDriverWait wait = new WebDriverWait(driver, timeout);
+        this.energyButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//span[text()='Energia']")));
+    }
+
+    public void waitAndMapEnergyButtonMonth(WebDriver driver, Duration timeout){
+        WebDriverWait wait = new WebDriverWait(driver, timeout);
+        this.energyButtonMonth = wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//i[@data-val='2' and contains(@class, 'btn_energy_compare_timeType')]")));
+        this.currentEnergyYear = wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//input[@id='val_energy_compare_Time' and @data-max]")));
     }
 
 

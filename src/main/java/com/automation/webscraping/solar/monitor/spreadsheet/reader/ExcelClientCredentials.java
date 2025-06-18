@@ -3,7 +3,7 @@ package com.automation.webscraping.solar.monitor.spreadsheet.reader;
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.model.InverterManufacturer;
 import com.automation.webscraping.solar.monitor.repository.InverterManufacturerRepository;
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidManufacturer;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidSpreadsheetCellValue;
 import org.apache.poi.ss.usermodel.Cell;

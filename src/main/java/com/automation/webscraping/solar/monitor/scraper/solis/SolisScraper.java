@@ -2,8 +2,7 @@ package com.automation.webscraping.solar.monitor.scraper.solis;
 
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
-import com.automation.webscraping.solar.monitor.scraper.growatt.GrowattElementMap;
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;

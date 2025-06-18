@@ -2,15 +2,11 @@ package com.automation.webscraping.solar.monitor.scraper.sungrow;
 
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
-import com.automation.webscraping.solar.monitor.scraper.growatt.GrowattElementMap;
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import lombok.extern.slf4j.Slf4j;
-import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;

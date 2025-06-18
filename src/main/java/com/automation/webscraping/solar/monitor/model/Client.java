@@ -1,6 +1,5 @@
 package com.automation.webscraping.solar.monitor.model;
 
-import com.automation.webscraping.solar.monitor.spreadsheet.enums.Manufacturers;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
