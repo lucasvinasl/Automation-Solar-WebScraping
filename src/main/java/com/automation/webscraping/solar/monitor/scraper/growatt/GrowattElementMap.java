@@ -17,8 +17,10 @@ public class GrowattElementMap {
     public WebElement energyButton;
     public WebElement energyButtonMonth;
     public WebElement currentEnergyYear;
+    public WebElement exportButton;
+    public WebElement annualReportOption;
 
-    public void waitAndMaoLoginElements(WebDriver driver, Duration timeout) {
+    public void waitAndMapLoginElements(WebDriver driver, Duration timeout) {
         WebDriverWait wait = new WebDriverWait(driver, timeout);
 
         this.usernameInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@placeholder='Usuário']")));
@@ -41,11 +43,21 @@ public class GrowattElementMap {
 
     public void waitAndMapEnergyButtonMonth(WebDriver driver, Duration timeout){
         WebDriverWait wait = new WebDriverWait(driver, timeout);
-        this.energyButtonMonth = wait.until(ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//i[@data-val='2' and contains(@class, 'btn_energy_compare_timeType')]")));
+        this.energyButtonMonth = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//i[@data-val='2' and contains(@class, 'btn_energy_compare_timeType') and text()='MES']")));
+
         this.currentEnergyYear = wait.until(ExpectedConditions.presenceOfElementLocated(
                 By.xpath("//input[@id='val_energy_compare_Time' and @data-max]")));
     }
 
+    public void waitAndMapExportButton(WebDriver driver, Duration timeout){
+        WebDriverWait wait = new WebDriverWait(driver, timeout);
+        this.exportButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//input[@value='Exportar']")));
+    }
+
+    public void waitAndMapAnnualReport(WebDriver driver, Duration timeout){
+        WebDriverWait wait = new WebDriverWait(driver, timeout);
+        this.annualReportOption = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//dd[@title='Relatório anual']")));
+    }
 
 }
