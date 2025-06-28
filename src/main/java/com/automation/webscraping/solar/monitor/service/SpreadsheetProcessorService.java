@@ -1,7 +1,8 @@
-package com.automation.webscraping.solar.monitor.spreadsheet.service;
+package com.automation.webscraping.solar.monitor.service;
 
 
 import com.automation.webscraping.solar.monitor.spreadsheet.processingqueue.*;
+import com.automation.webscraping.solar.monitor.spreadsheet.reader.GrowattSpreadsheetReader;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
@@ -29,6 +31,9 @@ public class SpreadsheetProcessorService {
 
     @Autowired
     private ProcessingErrorLogRepository processingErrorLogRepository;
+
+    @Autowired
+    private GrowattSpreadsheetReader growattSpreadsheetReader;
 
     @Scheduled(fixedDelay = 5000)
     @Transactional
@@ -84,9 +89,11 @@ public class SpreadsheetProcessorService {
                     entry.getFileName(), entry.getId(), entry.getClientName());
 
             // --- LÓGICA REAL DE PROCESSAMENTO DA PLANILHA AQUI ---
-            // Por enquanto, a simulação:
-            log.info("Simulando abertura e fechamento da planilha: {}", entry.getFilePath());
-            Thread.sleep(Duration.ofSeconds(2 + new Random().nextInt(3)).toMillis()); // Simula 2-4 segundos de trabalho
+            File excelFile = new File(entry.getFilePath());
+            if(excelFile.exists()){
+                log.info("Lendo a planilha.");
+                growattSpreadsheetReader.extractEnergyDataFromSpreadsheet(excelFile);
+            }
 
             // Ao final do processamento (sucesso)
             entry.setStatusQueue(ProcessingQueueStatus.COMPLETED);
@@ -95,12 +102,6 @@ public class SpreadsheetProcessorService {
             log.info("Planilha '{}' (ID: {}) processada com sucesso. Status: COMPLETED",
                     entry.getFileName(), entry.getId());
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // Restaura o estado de interrupção
-            log.warn("Processamento da planilha (ID: {}) interrompido.", entryId);
-            if (entry != null) {
-                handleProcessingError(entry, "Processamento interrompido: " + e.getMessage(), getStackTrace(e));
-            }
         } catch (Exception e) {
             log.error("Erro inesperado ao processar planilha (ID: {}): {}", entryId, e.getMessage(), e);
             if (entry != null) {

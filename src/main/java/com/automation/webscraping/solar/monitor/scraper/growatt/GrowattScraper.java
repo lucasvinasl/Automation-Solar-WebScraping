@@ -80,7 +80,7 @@ public class GrowattScraper implements PortalScraper {
             try{
                 plantsLits(driver, webElementMapped);
             }catch (RuntimeException e){
-                log.info("Cliente não possui condição de mais de uma planta: {}", e.getMessage());
+                log.info("Cliente não possui mais de uma planta: {}", e.getMessage());
             }
 
             clickOnEnergy(driver, webElementMapped);
@@ -104,7 +104,6 @@ public class GrowattScraper implements PortalScraper {
                         newEntry.getFileName(), newEntry.getClientName(), newEntry.getId());
             } else {
                 log.error("Download e renomeação da planilha falharam para o cliente: {}", client.getName());
-                // Opcional: registrar um erro no banco de dados para downloads falhos também.
             }
 
             //driver.quit();
