@@ -31,12 +31,7 @@ public class GrowattSpreadsheetReader {
     private static final String START_CELL_NAME = "Número de série do inversor";
     private static final String NEXT_SECTION_START_CELL_NAME = "Dados do storage : Carga de bateria hoje(kWh)";
 
-    /**
-     * Tenta obter o valor numérico de uma célula, independentemente do seu tipo (NUMERIC ou STRING).
-     * Lida com números formatados com vírgula como separador decimal.
-     * @param cell A célula do Excel.
-     * @return Um Optional contendo o valor Double se a conversão for bem-sucedida, ou um Optional vazio caso contrário.
-     */
+
     private Optional<Double> getNumericCellValue(Cell cell) {
         if (cell == null) {
             return Optional.empty();

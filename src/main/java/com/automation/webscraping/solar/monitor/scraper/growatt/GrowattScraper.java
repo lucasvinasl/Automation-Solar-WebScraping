@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -43,6 +44,8 @@ public class GrowattScraper implements PortalScraper {
             + File.separator + "SpreadsheetAutomation" + File.separator + "growatt_spreadsheets";
     private static final ZoneId LOCAL_ZONE_ID = ZoneId.of("America/Fortaleza");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss");
+    private final List<Client> unprocessedClients = new CopyOnWriteArrayList<>();
+    private static final int MAX_ATTEMPTS = 2;
 
     @Autowired
     private EnergyYearlyDataRepository energyYearlyDataRepository;
@@ -57,63 +60,97 @@ public class GrowattScraper implements PortalScraper {
 
     @Override
     public void webScrapingService(Client client) {
-        String clientDownloadDirectory =  BASE_DOWNLOAD_PATH + File.separator + sanitizeClientName(client.getName());
-        createDirectoryIfNotExists(clientDownloadDirectory);
 
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                doWebScraping(client);   // ----- toda a lógica original extraída
+                return;                  // ----- sucesso → sai do método
+            } catch (Exception ex) {
+                log.error("Tentativa {}/{} falhou para cliente {}: {}",
+                        attempt, MAX_ATTEMPTS, client.getName(), ex.getMessage(), ex);
+
+                if (attempt == MAX_ATTEMPTS) {
+                    unprocessedClients.add(client);
+                    log.warn("Cliente {} marcado como NÃO PROCESSADO.", client.getName());
+                } else {
+                    log.info("Reiniciando fluxo para o mesmo cliente {}…", client.getName());
+                }
+            }
+        }
+    }
+
+    /* =========================================================
+       Abaixo está a versão “pura” do scraping. Ela lança exceções
+       e garante que o ChromeDriver é fechado em QUALQUER cenário.
+       ========================================================= */
+    private void doWebScraping(Client client) throws Exception {
+
+        String downloadDir = BASE_DOWNLOAD_PATH + File.separator + sanitizeClientName(client.getName());
+        createDirectoryIfNotExists(downloadDir);
+
+        ChromeOptions options = buildChromeOptions(downloadDir);
+
+        // try-with-resources chama driver.quit() automaticamente
+        WebDriver driver = new ChromeDriver(options);
+        try{
+
+            String url = client.getInverterManufacturer().getPortalUrl();
+            driver.get(url);
+            driver.manage().window().maximize();
+
+            GrowattElementMap map = new GrowattElementMap();
+            login(client, driver, map);
+
+            try {
+                plantsLits(driver, map);
+            } catch (RuntimeException e) {
+                log.info("Cliente sem múltiplas plantas: {}", e.getMessage());
+            }
+
+            clickOnEnergy(driver, map);
+            Thread.sleep(1000);
+            clickOnEnergyMonth(driver, map);
+            Thread.sleep(1000);
+            clickOnExport(driver, map);
+            Thread.sleep(1000);
+            clickOnAnnualReport(driver, map);
+            Thread.sleep(1000);
+
+            File file = renameDownloadedFileSimple(downloadDir, Duration.ofSeconds(60));
+            if (file != null) {
+                ProcessingQueueEntry entry = new ProcessingQueueEntry(
+                        client, file.getAbsolutePath(), file.getName());
+                processingQueueEntryRepository.save(entry);
+                log.info("Planilha '{}' enfileirada (cliente {}, fila {}).",
+                        entry.getFileName(), client.getName(), entry.getId());
+            } else {
+                throw new IllegalStateException("Arquivo não baixado/renomeado.");
+            }
+        } catch (Exception e) {
+            log.error("Erro durante scraping: {}", e.getMessage(), e);
+            throw e;
+        } finally {
+            if (driver != null) {
+                driver.quit();
+            }
+        }
+        /* qualquer exceção aqui sobe para o for/try externo,
+           onde será contabilizada uma nova tentativa. */
+    }
+
+    /* ---------- helper isolado só para deixar o código principal enxuto ---------- */
+    private ChromeOptions buildChromeOptions(String downloadDir) {
         ChromeOptions options = new ChromeOptions();
         Map<String, Object> prefs = new HashMap<>();
-        prefs.put("download.default_directory", clientDownloadDirectory);
+        prefs.put("download.default_directory", downloadDir);
         prefs.put("download.prompt_for_download", false);
         prefs.put("download.directory_upgrade", true);
         prefs.put("safeBrowse.enabled", true);
         options.setExperimentalOption("prefs", prefs);
-
-        WebDriver driver = new ChromeDriver(options);
-        String url = client.getInverterManufacturer().getPortalUrl();
-        try{
-            driver.get(url);
-            driver.manage().window().maximize();
-            GrowattElementMap webElementMapped = new GrowattElementMap();
-
-            login(client, driver, webElementMapped);
-
-            try{
-                plantsLits(driver, webElementMapped);
-            }catch (RuntimeException e){
-                log.info("Cliente não possui mais de uma planta: {}", e.getMessage());
-            }
-
-            clickOnEnergy(driver, webElementMapped);
-            Thread.sleep(1000);
-            clickOnEnergyMonth(driver, webElementMapped);
-            Thread.sleep(1000);
-            clickOnExport(driver, webElementMapped);
-            Thread.sleep(1000);
-            clickOnAnnualReport(driver, webElementMapped);
-            Thread.sleep(1000);
-            File downloadedFile = renameDownloadedFileSimple(clientDownloadDirectory, Duration.ofSeconds(60));
-
-            if(downloadedFile != null){
-                ProcessingQueueEntry newEntry = new ProcessingQueueEntry(
-                        client,
-                        downloadedFile.getAbsolutePath(),
-                        downloadedFile.getName()
-                );
-                processingQueueEntryRepository.save(newEntry);
-                log.info("Planilha '{}' adicionada à fila de processamento para o cliente '{}'. ID da fila: {}",
-                        newEntry.getFileName(), newEntry.getClient().getName(), newEntry.getId());
-            } else {
-                log.error("Download e renomeação da planilha falharam para o cliente: {}", client.getName());
-            }
-
-            //driver.quit();
-        }catch (Exception e){
-            log.error("Erro ao tentar acessar portal da {}: {}", client.getInverterManufacturer().getName(), e.getMessage());
-            throw new RuntimeException(
-                    String.format("Erro ao tentar acessar portal da %s : %s", client.getInverterManufacturer().getName(), e.getMessage()));
-        }
-
+        return options;
     }
+
+    // … resto dos métodos (login, renameDownloadedFileSimple, etc.) permanece igual
 
     private String sanitizeClientName(String name){
         return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
@@ -135,24 +172,15 @@ public class GrowattScraper implements PortalScraper {
         }
     }
 
-    /**
-     * Espera pelo arquivo mais recente baixado no diretório de download
-     * e adiciona a data/hora atual ao seu nome original (antes da extensão).
-     * @param downloadDirectory Caminho do diretório de download.
-     * @param timeout Tempo máximo de espera.
-     * @return O arquivo renomeado, ou null se não for encontrado dentro do timeout.
-     */
     private File renameDownloadedFileSimple(String downloadDirectory, Duration timeout) {
         long endTime = System.currentTimeMillis() + timeout.toMillis();
         File downloadedFile = null;
 
         while (System.currentTimeMillis() < endTime) {
             File dir = new File(downloadDirectory);
-            // Filtra por arquivos que não são downloads incompletos
             File[] files = dir.listFiles((d, name) -> !name.endsWith(".crdownload") && !name.endsWith(".tmp"));
 
             if (files != null && files.length > 0) {
-                // Encontra o arquivo mais recentemente modificado (o que acabamos de baixar)
                 downloadedFile = Arrays.stream(files)
                         .max(Comparator.comparingLong(File::lastModified))
                         .orElse(null);
@@ -162,17 +190,14 @@ public class GrowattScraper implements PortalScraper {
                     String fileExtension = "";
                     String fileNameWithoutExtension = originalFullName;
 
-                    // Separa nome e extensão
                     int dotIndex = originalFullName.lastIndexOf('.');
                     if (dotIndex > 0 && dotIndex < originalFullName.length() - 1) {
                         fileExtension = originalFullName.substring(dotIndex);
                         fileNameWithoutExtension = originalFullName.substring(0, dotIndex);
                     }
 
-                    // Gera o timestamp atual
                     String timestamp = ZonedDateTime.now(LOCAL_ZONE_ID).format(DATE_TIME_FORMATTER);
 
-                    // Novo nome do arquivo: [NomeOriginalSemExtensao]_[Timestamp].[ExtensaoOriginal]
                     String newFileName = String.format("%s_%s%s",
                             fileNameWithoutExtension,
                             timestamp,
@@ -191,7 +216,7 @@ public class GrowattScraper implements PortalScraper {
                 }
             }
             try {
-                Thread.sleep(500); // Pequena pausa para o SO atualizar a lista de arquivos
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Interrupção durante a espera pelo download do arquivo.");
