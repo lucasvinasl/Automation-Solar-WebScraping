@@ -1,5 +1,6 @@
 package com.automation.webscraping.solar.monitor.spreadsheet.processingqueue;
 
+import com.automation.webscraping.solar.monitor.model.Client;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,8 +20,9 @@ public class ProcessingQueueEntry {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String clientName;
+    @ManyToOne
+    @JoinColumn(name = "client_id")
+    private Client client;
 
     @Column(nullable = false)
     private String filePath;
@@ -37,8 +39,8 @@ public class ProcessingQueueEntry {
     @Column(nullable = false)
     private ProcessingQueueStatus statusQueue;
 
-    public ProcessingQueueEntry(String clientName, String filePath, String fileName) {
-        this.clientName = clientName;
+    public ProcessingQueueEntry(Client client, String filePath, String fileName) {
+        this.client = client;
         this.filePath = filePath;
         this.fileName = fileName;
         this.insertedAt = ZonedDateTime.now(ZoneId.of("America/Fortaleza"));

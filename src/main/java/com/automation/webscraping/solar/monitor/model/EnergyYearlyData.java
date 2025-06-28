@@ -1,5 +1,6 @@
 package com.automation.webscraping.solar.monitor.model;
 
+import com.automation.webscraping.solar.monitor.spreadsheet.processingqueue.ProcessingQueueEntry;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -59,6 +60,12 @@ public class EnergyYearlyData {
     @ManyToOne
     @JoinColumn(name = "inverter_manufacturer_id", nullable = false)
     private InverterManufacturer inverterManufacturer;
+
+    @ManyToOne
+    @JoinColumn(name = "processing_queue_entry_id")
+    private ProcessingQueueEntry processingQueueEntry;
+
+    private String inverterSerialNumber;
 
 
 }

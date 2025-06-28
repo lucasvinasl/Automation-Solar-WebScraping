@@ -95,13 +95,13 @@ public class GrowattScraper implements PortalScraper {
 
             if(downloadedFile != null){
                 ProcessingQueueEntry newEntry = new ProcessingQueueEntry(
-                        client.getName(),
+                        client,
                         downloadedFile.getAbsolutePath(),
                         downloadedFile.getName()
                 );
                 processingQueueEntryRepository.save(newEntry);
                 log.info("Planilha '{}' adicionada à fila de processamento para o cliente '{}'. ID da fila: {}",
-                        newEntry.getFileName(), newEntry.getClientName(), newEntry.getId());
+                        newEntry.getFileName(), newEntry.getClient().getName(), newEntry.getId());
             } else {
                 log.error("Download e renomeação da planilha falharam para o cliente: {}", client.getName());
             }

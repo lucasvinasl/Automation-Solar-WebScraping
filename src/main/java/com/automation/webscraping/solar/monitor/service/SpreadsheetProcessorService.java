@@ -1,6 +1,11 @@
 package com.automation.webscraping.solar.monitor.service;
 
 
+import com.automation.webscraping.solar.monitor.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.model.EnergyYearlyData;
+import com.automation.webscraping.solar.monitor.model.InverterData;
+import com.automation.webscraping.solar.monitor.model.InverterManufacturer;
+import com.automation.webscraping.solar.monitor.repository.EnergyYearlyDataRepository;
 import com.automation.webscraping.solar.monitor.spreadsheet.processingqueue.*;
 import com.automation.webscraping.solar.monitor.spreadsheet.reader.GrowattSpreadsheetReader;
 import jakarta.transaction.Transactional;
@@ -14,12 +19,11 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 @Slf4j
 @Service
@@ -34,6 +38,9 @@ public class SpreadsheetProcessorService {
 
     @Autowired
     private GrowattSpreadsheetReader growattSpreadsheetReader;
+
+    @Autowired
+    private EnergyYearlyDataRepository energyYearlyDataRepository;
 
     @Scheduled(fixedDelay = 5000)
     @Transactional
@@ -50,7 +57,6 @@ public class SpreadsheetProcessorService {
 
         for (ProcessingQueueEntry entry : pendingEntries) {
             try {
-                // Tenta carregar a entrada novamente para garantir que não foi alterada por outra thread
                 Optional<ProcessingQueueEntry> currentEntryOpt = processingQueueEntryRepository.findById(entry.getId());
                 if (currentEntryOpt.isPresent() && currentEntryOpt.get().getStatusQueue() == ProcessingQueueStatus.PENDING) {
                     ProcessingQueueEntry currentEntry = currentEntryOpt.get();
@@ -79,25 +85,30 @@ public class SpreadsheetProcessorService {
             }
             entry = optionalEntry.get();
 
-            // Uma verificação adicional (defensiva), embora o agendador tente pegar PENDING e marque IN_PROGRESS
             if (entry.getStatusQueue() != ProcessingQueueStatus.IN_PROGRESS) {
                 log.warn("Planilha (ID: {}) não está no status IN_PROGRESS como esperado. Status atual: {}. Ignorando processamento real.", entryId, entry.getStatusQueue());
                 return;
             }
 
             log.info("Iniciando processamento REAL da planilha '{}' (ID: {}) para o cliente '{}'.",
-                    entry.getFileName(), entry.getId(), entry.getClientName());
+                    entry.getFileName(), entry.getId(), entry.getClient().getName());
 
-            // --- LÓGICA REAL DE PROCESSAMENTO DA PLANILHA AQUI ---
             File excelFile = new File(entry.getFilePath());
             if(excelFile.exists()){
-                log.info("Lendo a planilha.");
-                growattSpreadsheetReader.extractEnergyDataFromSpreadsheet(excelFile);
+                if(optionalEntry.get().getClient().getInverterManufacturer().getName().equalsIgnoreCase(Manufacturers.GROWATT.getName())){
+                    log.info("Lendo a planilha Growatt.");
+                    List<InverterData> inverterDataGrowatt = growattSpreadsheetReader.extractEnergyDataFromSpreadsheet(excelFile);
+                    if (inverterDataGrowatt != null && !inverterDataGrowatt.isEmpty()) {
+                        log.info("Salvando os registros da planilha no banco para {} inversores.", inverterDataGrowatt.size());
+                        populateEnergyData(inverterDataGrowatt, entry);
+                    } else {
+                        log.warn("Nenhum dado de energia extraído da planilha para o cliente '{}'.", entry.getClient().getName());
+                    }
+                }
             }
 
-            // Ao final do processamento (sucesso)
             entry.setStatusQueue(ProcessingQueueStatus.COMPLETED);
-            entry.setProcessedAt(ZonedDateTime.now(ZoneId.of("America/Fortaleza"))); // Define a hora de processamento
+            entry.setProcessedAt(ZonedDateTime.now(ZoneId.of("America/Fortaleza")));
             processingQueueEntryRepository.save(entry);
             log.info("Planilha '{}' (ID: {}) processada com sucesso. Status: COMPLETED",
                     entry.getFileName(), entry.getId());
@@ -124,5 +135,137 @@ public class SpreadsheetProcessorService {
         StringWriter sw = new StringWriter();
         e.printStackTrace(new PrintWriter(sw));
         return sw.toString();
+    }
+
+    private void populateEnergyData(List<InverterData> allInverters, ProcessingQueueEntry entry) {
+
+        for (InverterData inverterData : allInverters) {
+
+            Optional<EnergyYearlyData> energyYearlyData = energyYearlyDataRepository
+                    .findOneByYearAndClientIdAndInverterSerial(inverterData.getYear(),
+                            entry.getClient().getId(),inverterData.getSerialNumber());
+
+            if(energyYearlyData.isPresent()){
+                log.info("Registro do inversor {} já existe, atualizando... ", inverterData.getSerialNumber());
+                for (Map.Entry<Integer, Double> monthEntry : inverterData.getMonthlyGeneration().entrySet()) {
+                    int month = monthEntry.getKey();
+                    double value = monthEntry.getValue();
+                    if (month >= 1 && month <= 12) {
+                        switch (month) {
+                            case 1 ->{
+                                if(!energyYearlyData.get().getJanuary().equals(value)){
+                                    log.info("Janeiro está diferente, atualizando.");
+                                    energyYearlyData.get().setJanuary(value);
+                                }
+                            }
+                            case 2 -> {
+                                if(!energyYearlyData.get().getFebruary().equals(value)){
+                                    log.info("Fevereiro está diferente, atualizando.");
+                                    energyYearlyData.get().setFebruary(value);
+                                }
+                            }
+                            case 3 -> {
+                                if(!energyYearlyData.get().getMarch().equals(value)){
+                                    log.info("Março está diferente, atualizando.");
+                                    energyYearlyData.get().setMarch(value);
+                                }
+                            }
+                            case 4 -> {
+                                if(!energyYearlyData.get().getApril().equals(value)){
+                                    log.info("Abril está diferente, atualizando.");
+                                    energyYearlyData.get().setApril(value);
+                                }
+                            }
+                            case 5 -> {
+                                if(!energyYearlyData.get().getMay().equals(value)){
+                                    log.info("Maio está diferente, atualizando.");
+                                    energyYearlyData.get().setMay(value);
+                                }
+                            }
+                            case 6 -> {
+                                if(!energyYearlyData.get().getJune().equals(value)){
+                                    log.info("Junho está diferente, atualizando.");
+                                    energyYearlyData.get().setJuly(value);
+                                }
+                            }
+                            case 7 -> {
+                                if(!energyYearlyData.get().getJuly().equals(value)){
+                                    log.info("Julho está diferente, atualizando.");
+                                    energyYearlyData.get().setJuly(value);
+                                }
+                            }
+                            case 8 -> {
+                                if(!energyYearlyData.get().getAugust().equals(value)){
+                                    log.info("Agosto está diferente, atualizando.");
+                                    energyYearlyData.get().setAugust(value);
+                                }
+                            }
+                            case 9 -> {
+                                if(!energyYearlyData.get().getSeptember().equals(value)){
+                                    log.info("Setembro está diferente, atualizando.");
+                                    energyYearlyData.get().setSeptember(value);
+                                }
+                            }
+                            case 10 -> {
+                                if(!energyYearlyData.get().getOctober().equals(value)){
+                                    log.info("Outubro está diferente, atualizando.");
+                                    energyYearlyData.get().setOctober(value);
+                                }
+                            }
+                            case 11 -> {
+                                if(!energyYearlyData.get().getNovember().equals(value)){
+                                    log.info("Novembro está diferente, atualizando.");
+                                    energyYearlyData.get().setNovember(value);
+                                }
+                            }
+                            case 12 -> {
+                                if(!energyYearlyData.get().getDecember().equals(value)){
+                                    log.info("Dezembro está diferente, atualizando.");
+                                    energyYearlyData.get().setDecember(value);
+                                }
+                            }
+                        }
+                    }
+                }
+                InverterManufacturer manufacturer = entry.getClient().getInverterManufacturer();
+                energyYearlyData.get().setInverterManufacturer(manufacturer);
+                energyYearlyData.get().setProcessingQueueEntry(entry);
+                energyYearlyDataRepository.save(energyYearlyData.get());
+                log.info("Saved energy data for year {} for client {}",
+                        energyYearlyData.get().getYear(), entry.getClient().getName());
+            }else {
+                EnergyYearlyData newEnergyYearlyData = new EnergyYearlyData();
+                newEnergyYearlyData.setYear(inverterData.getYear());
+                newEnergyYearlyData.setClient(entry.getClient());
+                newEnergyYearlyData.setInverterManufacturer(entry.getClient().getInverterManufacturer());
+                for (Map.Entry<Integer, Double> monthEntry : inverterData.getMonthlyGeneration().entrySet()) {
+                    int month = monthEntry.getKey();
+                    double value = monthEntry.getValue();
+                    if (month >= 1 && month <= 12) {
+                        switch (month) {
+                            case 1 -> newEnergyYearlyData.setJanuary(value);
+                            case 2 -> newEnergyYearlyData.setFebruary(value);
+                            case 3 -> newEnergyYearlyData.setMarch(value);
+                            case 4 -> newEnergyYearlyData.setApril(value);
+                            case 5 -> newEnergyYearlyData.setMay(value);
+                            case 6 -> newEnergyYearlyData.setJune(value);
+                            case 7 -> newEnergyYearlyData.setJuly(value);
+                            case 8 -> newEnergyYearlyData.setAugust(value);
+                            case 9 -> newEnergyYearlyData.setSeptember(value);
+                            case 10 -> newEnergyYearlyData.setOctober(value);
+                            case 11 -> newEnergyYearlyData.setNovember(value);
+                            case 12 -> newEnergyYearlyData.setDecember(value);
+                        }
+                    }
+                }
+                InverterManufacturer manufacturer = entry.getClient().getInverterManufacturer();
+                newEnergyYearlyData.setInverterManufacturer(manufacturer);
+                newEnergyYearlyData.setProcessingQueueEntry(entry);
+                newEnergyYearlyData.setInverterSerialNumber(inverterData.getSerialNumber());
+                energyYearlyDataRepository.save(newEnergyYearlyData);
+                log.info("Saved energy data for year {} for client {}",
+                        newEnergyYearlyData.getYear(), entry.getClient().getName());
+            }
+        }
     }
 }
