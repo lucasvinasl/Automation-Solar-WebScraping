@@ -204,7 +204,7 @@ public class GrowattScraper implements PortalScraper {
 
 
     private void login(Client client, WebDriver driver, GrowattElementMap webElementMapped) throws InterruptedException {
-        webElementMapped.waitAndMapLoginElements(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapLoginElements(driver, Duration.ofSeconds(10));
 
         webElementMapped.usernameInput.sendKeys(client.getUsername());
         webElementMapped.passwordInput.sendKeys(client.getPassword());
@@ -220,7 +220,7 @@ public class GrowattScraper implements PortalScraper {
     // verificar se tem mais de uma planta ou mais de um inversor no caso de Ethan
     public List<WebElement> plantsLits(WebDriver driver, GrowattElementMap webElementMapped){
 
-        webElementMapped.waitAndMapPlantListVerify(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapPlantListVerify(driver, Duration.ofSeconds(10));
 
         //List<WebElement> plants = driver.findElements(By.xpath("//div[@id='selectPlant-con']/ul/li"));
         List<WebElement> plants = webElementMapped.selectPlant.findElements(By.xpath(".//li"));
@@ -239,22 +239,22 @@ public class GrowattScraper implements PortalScraper {
     }
 
     private void clickOnEnergy(WebDriver driver, GrowattElementMap webElementMapped){
-        webElementMapped.waitAndMapEnergyButton(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapEnergyButton(driver, Duration.ofSeconds(10));
         webElementMapped.energyButton.click();
     }
 
     private void clickOnEnergyMonth(WebDriver driver, GrowattElementMap webElementMapped){
-        webElementMapped.waitAndMapEnergyButtonMonth(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapEnergyButtonMonth(driver, Duration.ofSeconds(10));
         webElementMapped.energyButtonMonth.click();
     }
 
     private void clickOnExport(WebDriver driver, GrowattElementMap webElementMapped){
-        webElementMapped.waitAndMapExportButton(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapExportButton(driver, Duration.ofSeconds(10));
         webElementMapped.exportButton.click();
     }
 
     private void clickOnAnnualReport(WebDriver driver, GrowattElementMap webElementMapped){
-        webElementMapped.waitAndMapAnnualReport(driver, Duration.ofSeconds(5));
+        webElementMapped.waitAndMapAnnualReport(driver, Duration.ofSeconds(10));
         webElementMapped.annualReportOption.click();
     }
 }

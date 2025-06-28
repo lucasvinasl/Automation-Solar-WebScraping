@@ -1,10 +1,12 @@
 package com.automation.webscraping.solar.monitor.service;
 
+import com.automation.webscraping.solar.monitor.dto.ExcelClientCredentialsImportDTO;
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.repository.ClientRepository;
 import com.automation.webscraping.solar.monitor.scraper.PortalScraper;
 import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import com.automation.webscraping.solar.monitor.spreadsheet.reader.ExcelClientCredentials;
+import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -53,9 +55,17 @@ public class AutomationSerivce {
         }
     }
 
-    public void consumeSpreadsheetClient(){
+    public ExcelClientCredentialsImportDTO consumeSpreadsheetClient(){
         File fileExcel = new File("C:/Users/usuario/Documents/SpreadsheetAutomation/Client_Credentials_By_Manufacturer.xlsx");
-        List<Client> clientList = excelClientCredentials.readClientsCredentials(fileExcel);
+        List<Client> validClients = excelClientCredentials.readClientsCredentials(fileExcel);
+        int invalidClients = excelClientCredentials.getInvalidClients();
+        resetClients(validClients);
+        return new ExcelClientCredentialsImportDTO(validClients.size(), invalidClients);
+    }
+
+    @Transactional
+    protected void resetClients(List<Client> clientList){
+        clientRepository.deleteAll();
         clientRepository.saveAll(clientList);
     }
 

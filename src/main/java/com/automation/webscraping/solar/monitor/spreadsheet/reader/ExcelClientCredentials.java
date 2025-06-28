@@ -6,6 +6,7 @@ import com.automation.webscraping.solar.monitor.repository.InverterManufacturerR
 import com.automation.webscraping.solar.monitor.enums.Manufacturers;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidManufacturer;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidSpreadsheetCellValue;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -28,25 +29,31 @@ public class ExcelClientCredentials {
     Aqui será feita a leitura da planilha onde contém os dados de login de usuário.
     Isso aqui provavelmente só vai rodar uma vez, no momento que for para montar o banco de dados
     com base nos clientes que já existem.
- */
-    private final List<Client> invalidClients = new ArrayList<>();
-
+    */
+    int invalidClient = 0;
     @Autowired
     private InverterManufacturerRepository inverterManufacturerRepository;
 
     public List<Client> readClientsCredentials(File fileExcel) {
+
         List<Client> clientList = new ArrayList<>();
-        try (
-                FileInputStream fileInputStream = new FileInputStream(fileExcel);
-                Workbook workbook = new XSSFWorkbook(fileInputStream)
-        ) {
+        Workbook workbook = null;
+        try (FileInputStream fileInputStream = new FileInputStream(fileExcel)) {
+
+            if (fileExcel.getName().toLowerCase().endsWith(".xlsx")) {
+                workbook = new XSSFWorkbook(fileInputStream);
+            } else if (fileExcel.getName().toLowerCase().endsWith(".xls")) {
+                workbook = new HSSFWorkbook(fileInputStream);
+            } else {
+                throw new IllegalArgumentException("Formato de arquivo não suportado, deve ser .xls ou .xlsx");
+            }
 
             for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
                 Sheet sheet = workbook.getSheetAt(i);
                 String sheetName = sheet.getSheetName();
 
                 Manufacturers manufacturerEnum = Manufacturers.valueOf(sheetName.toUpperCase());
-                InverterManufacturer inverterManufacturer = inverterManufacturerRepository.findByName(manufacturerEnum.name())
+                InverterManufacturer inverterManufacturer = inverterManufacturerRepository.findByName(manufacturerEnum.getName())
                             .orElseThrow(()-> new InvalidManufacturer("Fabricante %s não cadastrado.".formatted(sheetName)));
 
                 if (inverterManufacturer != null) {
@@ -60,12 +67,13 @@ public class ExcelClientCredentials {
                         !"Cliente".equalsIgnoreCase(headers.getCell(0).getStringCellValue().trim()) ||
                         !"Usuário".equalsIgnoreCase(headers.getCell(1).getStringCellValue().trim()) ||
                         !"Senha".equalsIgnoreCase(headers.getCell(2).getStringCellValue().trim())) {
-                    throw new InvalidSpreadsheetCellValue("Cabeçalhos fora do padrão esperado: Cliente, Usuário, Senha");
+                    throw new InvalidSpreadsheetCellValue("Cabeçalhos fora do padrão esperado: Cliente | Usuário | Senha");
                 }
 
                 Iterator<Row> rowIterator = sheet.iterator();
                 rowIterator.next();
                 int countRow = 2;
+                boolean hasInvalidClients = false;
                 while (rowIterator.hasNext()) {
                     Row row = rowIterator.next();
                     try {
@@ -74,12 +82,7 @@ public class ExcelClientCredentials {
                         String password = verifyCell(row.getCell(2));
 
                         if (name.isBlank() || username.isBlank() || password.isBlank()) {
-                            Client invalidClient = new Client();
-                            invalidClient.setName(name);
-                            invalidClient.setUsername(username);
-                            invalidClient.setPassword(password);
-                            invalidClient.setInverterManufacturer(inverterManufacturer);
-                            invalidClients.add(invalidClient);
+                            invalidClient++;
                             countRow++;
                             continue;
                         }
@@ -104,8 +107,8 @@ public class ExcelClientCredentials {
         return clientList;
     }
 
-    public List<Client> getInvalidClients() {
-        return invalidClients;
+    public int getInvalidClients() {
+        return invalidClient;
     }
 
     private String verifyCell(Cell cell) {
@@ -113,8 +116,8 @@ public class ExcelClientCredentials {
 
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue()); // ou `.toString()` se quiser manter decimal
-            case FORMULA -> cell.getCellFormula(); // ou `cell.getStringCellValue()` se a fórmula retornar texto
+            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
+            case FORMULA -> cell.getCellFormula();
             case BLANK -> "";
             default -> throw new RuntimeException("Tipo de célula não suportado: " + cell.getCellType());
         };
