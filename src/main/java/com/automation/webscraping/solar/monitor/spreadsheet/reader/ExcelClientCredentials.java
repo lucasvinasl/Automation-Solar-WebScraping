@@ -1,11 +1,15 @@
 package com.automation.webscraping.solar.monitor.spreadsheet.reader;
 
+import com.automation.webscraping.solar.monitor.dto.ExcelClientCredentialsImportDTO;
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.model.InverterManufacturer;
+import com.automation.webscraping.solar.monitor.repository.ClientRepository;
 import com.automation.webscraping.solar.monitor.repository.InverterManufacturerRepository;
 import com.automation.webscraping.solar.monitor.enums.Manufacturers;
+import com.automation.webscraping.solar.monitor.service.AutomationSerivce;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidManufacturer;
 import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.InvalidSpreadsheetCellValue;
+import jakarta.transaction.Transactional;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -30,13 +34,15 @@ public class ExcelClientCredentials {
     Isso aqui provavelmente só vai rodar uma vez, no momento que for para montar o banco de dados
     com base nos clientes que já existem.
     */
-    int invalidClient = 0;
     @Autowired
     private InverterManufacturerRepository inverterManufacturerRepository;
+    @Autowired
+    private ClientRepository clientRepository;
 
-    public List<Client> readClientsCredentials(File fileExcel) {
+    public ExcelClientCredentialsImportDTO readClientsCredentials(File fileExcel) {
 
         List<Client> clientList = new ArrayList<>();
+        int invalidClient = 0;
         Workbook workbook = null;
         try (FileInputStream fileInputStream = new FileInputStream(fileExcel)) {
 
@@ -73,7 +79,6 @@ public class ExcelClientCredentials {
                 Iterator<Row> rowIterator = sheet.iterator();
                 rowIterator.next();
                 int countRow = 2;
-                boolean hasInvalidClients = false;
                 while (rowIterator.hasNext()) {
                     Row row = rowIterator.next();
                     try {
@@ -104,11 +109,14 @@ public class ExcelClientCredentials {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return clientList;
+        resetClients(clientList);
+        return new ExcelClientCredentialsImportDTO(clientList.size(), invalidClient);
     }
 
-    public int getInvalidClients() {
-        return invalidClient;
+    @Transactional
+    public void resetClients(List<Client> clientList){
+        clientRepository.deleteAll();
+        clientRepository.saveAll(clientList);
     }
 
     private String verifyCell(Cell cell) {

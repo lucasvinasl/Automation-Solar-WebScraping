@@ -2,7 +2,7 @@ package com.automation.webscraping.solar.monitor.service;
 
 import com.automation.webscraping.solar.monitor.model.Client;
 import com.automation.webscraping.solar.monitor.repository.ClientRepository;
-import org.openqa.selenium.NotFoundException;
+import com.automation.webscraping.solar.monitor.spreadsheet.exceptions.ClientNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +17,7 @@ public class ClientService {
     public List<Client> findAll(){
         List<Client> clients = clientRepository.findAll();
         if(clients.isEmpty()){
-            throw new NotFoundException("Nenhum cliente encontrado");
+            throw new ClientNotFoundException("Nenhum cliente encontrado.");
         }
         return clients;
     }
